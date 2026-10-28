@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ordo-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ordo
+      POSTGRES_PASSWORD: ordo_secret
+      POSTGRES_DB: ordo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: ordo-redis
+    ports:
+      - "6379:6379"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: ordo-mailpit
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: ordo-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://ordo:ordo_secret@db:5432/ordo_db
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+    depends_on:
+      - db
+      - redis
+      - mailpit
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: ordo-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+
